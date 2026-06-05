@@ -27,7 +27,7 @@ import serial.tools.list_ports
 from config import BAIDU_APP_ID, BAIDU_API_KEY, BAIDU_SECRET_KEY, DEEPSEEK_API_KEY
 
 # ==================== 常量 ====================
-BAUDRATE = 921600
+BAUDRATE = 230400
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
 
 # 百度 ASR 接口

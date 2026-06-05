@@ -24,7 +24,7 @@ import time
 import serial
 import serial.tools.list_ports
 
-BAUDRATE = 921600
+BAUDRATE = 230400
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "recordings")
 
 
