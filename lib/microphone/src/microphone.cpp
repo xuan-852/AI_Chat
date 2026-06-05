@@ -90,7 +90,6 @@ size_t Microphone::read(int16_t* buffer, size_t buffer_len) {
 
         size_t got = bytes_read / sizeof(int32_t);
         for (size_t i = 0; i < got; ++i) {
-            // INMP441 在 32-bit 槽中输出 24-bit 有效数据，右移 16bit 后得到标准 int16 PCM。
             buffer[total_samples + i] = (int16_t)(temp_buffer[i] >> 16);
         }
         total_samples += got;
