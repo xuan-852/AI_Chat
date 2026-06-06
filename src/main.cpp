@@ -320,24 +320,30 @@ static void start_ai_dialog() {
         return;
     }
 
-    // 输出回复（逐行发送，防止乱码）
+    // 输出回复（按 UTF-8 字符边界切割，防止中文被截断）
     Serial.println("\n" + String(55, '-'));
-    Serial.flush();
-    delay(20);
     Serial.println("🤖 DeepSeek:");
-    Serial.flush();
-    delay(20);
-    // 长文本分块发送
-    for (size_t pos = 0; pos < reply.length(); pos += 64) {
-        Serial.print(reply.substring(pos, pos + 64));
-        Serial.flush();
-        delay(10);
+    {
+        const char* p = reply.c_str();
+        size_t remain = reply.length();
+        while (remain > 0) {
+            // 找不截断 UTF-8 字符的分块位置（最多 128 字节）
+            size_t n = (remain > 128) ? 128 : remain;
+            // 如果边界落在多字节字符中间，回退到字符开头
+            for (size_t i = n; i > 0; i--) {
+                if (((unsigned char)p[i-1] & 0xC0) != 0x80) {
+                    n = i;
+                    break;
+                }
+            }
+            if (n == 0) n = 1;   // 安全兜底
+            Serial.write(p, n);
+            p += n;
+            remain -= n;
+        }
+        Serial.println();
     }
-    Serial.println();
-    Serial.flush();
-    delay(20);
     Serial.println(String(55, '-') + "\n");
-    Serial.flush();
 }
 
 // ============================================================

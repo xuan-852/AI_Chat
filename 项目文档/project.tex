@@ -2,10 +2,8 @@
 
 \usepackage[top=2.54cm, bottom=2.54cm, left=3.17cm, right=3.17cm]{geometry}
 \usepackage{setspace}
-\usepackage{graphicx}
 \usepackage{array}
 \usepackage{tabularx}
-\usepackage{booktabs}
 \usepackage{xcolor}
 \usepackage{fancyhdr}
 \usepackage{titlesec}
@@ -17,7 +15,7 @@
 % ========== 页眉页脚 ==========
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[C]{\small ESP32S3 AI 联网对话 \& 无线手柄 —— 项目说明}
+\fancyhead[C]{\small ESP32-S3 AI 语音对话 —— 项目开发说明}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
@@ -36,8 +34,9 @@
 
 % ========== 任务状态命令 ==========
 \newcommand{\taskdone}{{\color{success}$\blacksquare$}}
-\newcommand{\taskdoing}{{\color{warning}$\blacksquare$}}
+\newcommand{\taskwarn}{{\color{warning}$\blacksquare$}}
 \newcommand{\tasktodo}{{\color{graytext}$\blacksquare$}}
+\newcommand{\taskfail}{{\color{accent}$\blacksquare$}}
 
 \begin{document}
 
@@ -45,30 +44,29 @@
 % 封面
 % ==========================================
 \begin{titlepage}
-    \vspace*{3cm}
+    \vspace*{2cm}
     \begin{center}
-        {\heiti\Huge \color{primary} ESP32-S3 项目开发说明}\\[15pt]
-        {\kaishu\LARGE AI 联网对话 \quad \textbar \quad 无线手柄}\\[30pt]
-        
+        {\heiti\Huge \color{primary} ESP32-S3 AI 语音对话}\\[8pt]
+        {\kaishu\LARGE 项目开发说明}\\[20pt]
+
         \vfill
-        
+
         \begin{tikzpicture}[scale=1.2]
-            \draw[thick,primary,rounded corners] (-4.5,-0.5) rectangle (4.5,0.5);
-            \node[primary] at (0,0) {\kaishu\Large 基于 ESP32-S3 的智能交互系统};
+            \draw[thick,primary,rounded corners] (-5.5,-0.5) rectangle (5.5,0.5);
+            \node[primary] at (0,0) {\kaishu\Large INMP441 $\rightarrow$ 百度 ASR $\rightarrow$ DeepSeek $\rightarrow$ 示波器显示};
         \end{tikzpicture}
-        
+
         \vspace{30pt}
-        
+
         {\large
          \begin{tabular}{rl}
-            \heiti 硬件平台： & \songti ESP32-S3 \\
-            \heiti 开发环境： & \songti PlatformIO / Arduino IDE \\
-            \heiti 预计周期： & \songti 15 天 \\
-            \heiti 文档版本： & \songti v1.0 \\
-            \heiti 编制日期： & \songti 2026年5月
+            \heiti 硬件平台： & \songti ESP32-S3 (RYMCU-DevKitC N8R2) \\
+            \heiti 麦克风：   & \songti INMP441 (I2S 标准模式) \\
+            \heiti 开发环境： & \songti PlatformIO (VS Code) + Keil MDK \\
+            \heiti 文档版本： & \songti v2.1
          \end{tabular}
         }
-        
+
         \vspace{20pt}
     \end{center}
 \end{titlepage}
@@ -85,621 +83,416 @@
 % ==========================================
 \chapter{项目概述}
 
-\section{项目背景}
-
-本项目基于 ESP32-S3 微控制器，旨在开发一套具备 AI 联网对话能力和无线手柄控制功能的智能交互系统。ESP32-S3 以其强大的双核处理器、丰富的外设接口（I2S、SPI、I2C、UART 等）以及内置 Wi-Fi 和 BLE 功能，非常适合作为本项目的主控芯片。
-
 \section{项目目标}
 
-\begin{enumerate}[leftmargin=2em]
-    \item \textbf{AI 联网对话}：通过硅麦（PDM 数字麦克风）采集语音，上传至云端进行语音识别（ASR），调用大语言模型（LLM）API 生成回复，再通过 TTS 语音合成后经扬声器播放，实现完整的语音对话闭环。
-    \item \textbf{无线手柄}：基于 Wi-Fi（UDP/TCP）通信，实现外接手柄与 ESP32-S3 之间的无线数据传输，用于控制 PWM 显示器等外设。
-    \item \textbf{屏幕显示}：在 OLED 或 LCD 屏幕上实时显示对话内容、手柄状态等信息。
-\end{enumerate}
+通过 INMP441 采集语音，调用百度语音识别 (ASR) 和 DeepSeek 大语言模型 (LLM) 生成回复，最终通过 UART 将英文回复发送给 STM32 主机，在示波器 (XY 模式) 上显示文字。
+
+\section{当前阶段}
+
+当前项目处于 \textbf{第一阶段}（ESP32 端适配），已完成 ESP32 上录音、ASR、LLM 全链路的开发和验证，正进行示波器显示方向的适配改造。
+
+\section{快速开始}
+
+\subsection*{编译与上传}
+\begin{verbatim}
+# 进入项目目录
+cd AI_Chat
+
+# 编译
+pio run
+
+# 上传（ESP32-S3 默认使用 COM9 USB-Serial/JTAG 端口）
+pio run -t upload --upload-port COM9
+
+# 串口监视器
+pio device monitor -b 115200 --port COM9
+\end{verbatim}
+
+\subsection*{串口命令}
+\begin{center}
+\begin{tabularx}{0.7\textwidth}{|c|X|}
+    \hline
+    \heiti 命令 & \heiti 功能\\
+    \hline
+    \texttt{s / S} & 开始一轮对话（录音→ASR→LLM→回复）\\
+    \hline
+    \texttt{w} & 重新连接 WiFi\\
+    \hline
+    \texttt{h / H} & 打印帮助信息\\
+    \hline
+\end{tabularx}
+\end{center}
+
+\subsection*{端口说明}
+\begin{itemize}
+    \item ESP32-S3 使用 USB-Serial/JTAG 内置串口，在 Windows 上通常识别为 \texttt{COM9}。
+    \item 如果上次上传后未断电，再次上传可能端口被占用，此时需按一下板子上的 \texttt{RST} 按钮再试。
+    \item 蓝牙虚拟 COM 口（如 COM3/COM5/COM6/COM7/COM8/COM13/COM14/COM18/COM19）不可用于 ESP32 上传。
+\end{itemize}
 
 \section{系统架构}
 
 \begin{center}
 \vspace{10pt}
 \begin{tikzpicture}[
-    node distance=1.5cm,
-    box/.style={rectangle, draw, rounded corners, thick, text centered, minimum width=2.8cm, minimum height=1.0cm, font=\small},
+    node distance=1.8cm,
+    box/.style={rectangle, draw, rounded corners, thick, align=center, text width=2.5cm, minimum height=1.0cm, font=\small},
     arrow/.style={-{Latex[length=2.5mm]}, thick}
 ]
 
-% 节点
-\node[box, fill=blue!10!white, draw=blue] (mic) {硅麦 \\(PDM 麦克风)};
+\node[box, fill=blue!10!white, draw=blue] (mic) {INMP441 \\ I2S 麦克风};
 \node[box, fill=red!10!white, draw=red, right=of mic] (esp) {ESP32-S3};
-\node[box, fill=green!10!white, draw=green, right=of esp] (cloud) {云端 API \\(ASR + LLM + TTS)};
-\node[box, fill=orange!10!white, draw=orange, below=of esp] (screen) {显示屏 \\(OLED/LCD)};
-\node[box, fill=purple!10!white, draw=purple, above=of esp] (speaker) {扬声器};
-\node[box, fill=teal!10!white, draw=teal, below=of screen] (controller) {无线手柄};
-\node[box, fill=teal!10!white, draw=teal, right=of controller] (pwm) {PWM 显示器};
+\node[box, fill=green!10!white, draw=green, right=of esp, yshift=1.2cm] (baidu) {百度 ASR};
+\node[box, fill=green!10!white, draw=green, right=of esp, yshift=-1.2cm] (deepseek) {DeepSeek LLM};
+\node[box, fill=orange!10!white, draw=orange, below=of esp] (stm) {STM32F407};
+\node[box, fill=purple!10!white, draw=purple, below=of stm] (scope) {示波器 XY 显示};
 
-% 箭头
-\draw[arrow] (mic) -- node[above,font=\tiny] {PDM 音频数据} (esp);
-\draw[arrow] (esp) -- node[above,font=\tiny] {HTTP/Wi-Fi} (cloud);
-\draw[arrow] (cloud) -- node[below,font=\tiny] {回复文本/音频} (esp);
-\draw[arrow] (esp) -- node[right,font=\tiny] {音频输出} (speaker);
-\draw[arrow] (esp) -- node[right,font=\tiny] {SPI/I2C} (screen);
-\draw[arrow] (controller) -- node[left,font=\tiny] {Wi-Fi UDP/TCP} (screen);
-\draw[arrow] (controller) -- node[below,font=\tiny] {控制信号} (pwm);
+\draw[arrow] (mic) -- node[above,font=\tiny] {I2S 32bit $\to$ 16bit PCM} (esp);
+\draw[arrow] (esp) -- node[right,font=\tiny] {HTTP POST 裸PCM} (baidu);
+\draw[arrow] (esp) -- node[right,font=\tiny] {HTTP POST JSON} (deepseek);
+\draw[arrow] (baidu) -- node[left,font=\tiny] {识别文本} (esp);
+\draw[arrow] (deepseek) -- node[left,font=\tiny] {回复文本} (esp);
+\draw[arrow] (esp) -- node[right,font=\tiny] {UART 115200} (stm);
+\draw[arrow] (stm) -- node[right,font=\tiny] {DAC X/Y} (scope);
 
 \end{tikzpicture}
 \vspace{10pt}
 \end{center}
 
-\section{硬件清单}
+% ==========================================
+% 二、功能模块状态
+% ==========================================
+\chapter{功能模块状态}
 
 \begin{center}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|c|X|c|}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{|c|X|c|X|}
     \hline
-    \heiti 序号 & \heiti 器件 & \heiti 备注\\
+    \heiti 模块 & \heiti 功能 & \heiti 状态 & \heiti 注意点\\
     \hline
-    1 & ESP32-S3 开发板 & 主控芯片，推荐 ESP32-S3-DevKitC 或合宙等型号\\
+    音频采集 & INMP441 I2S 驱动 (16kHz, 16bit, 单声道) & \taskdone 已完成 & 标准 I2S RX，不能用 PDM 模式 \\
     \hline
-    2 & PDM 硅麦克风 & 如 INMP441、MSM261S4030H0 等，用于语音采集\\
+    WiFi 联网 & Station 模式连手机热点 & \taskdone 已完成 & 无自动重连，需手动 'w' 命令 \\
     \hline
-    3 & I2S 扬声器/功放模块 & MAX98357 + 小喇叭，用于语音播放\\
+    百度 ASR & 裸 PCM POST 语音识别 & \taskdone 已完成 & dev\_pid=1537，token 缓存 29 天 \\
     \hline
-    4 & OLED/LCD 显示屏 & 0.96寸 SSD1306 OLED 或 1.8寸 TFT\\
+    DeepSeek LLM & HTTP POST 对话 & \taskdone 已完成 & 无 /v1/ 前缀，HTTP/1.0 强制，模型 deepseek-v4-flash \\
     \hline
-    5 & 按钮/开关 & 按键触发录音、模式切换等\\
+    全链路串通 & 录音$\to$ASR$\to$LLM$\to$输出 & \taskdone 已完成 & 已验证输出故事，中文偶尔乱码 \\
     \hline
-    6 & 无线手柄 (ESP32) & 第二块 ESP32 作为手柄端，发送控制指令\\
+    内存管理 & PSRAM 利用 & \taskfail 有问题 & PSRAM ID 读取错误，fallback 到 malloc \\
     \hline
-    7 & PWM 显示器 & 已有的外设，通过手柄控制\\
+    稳定性 & 防崩溃 & \taskfail 有问题 & 5秒录音+HTTP 可能触发 StoreProhibited \\
+    \hline
+    DeepSeek 提示词 & 改为英文回复 & \taskwarn 待修改 & 适配示波器 ASCII 显示需要 \\
+    \hline
+    UART 通信 & ESP32 $\to$ STM32 & \tasktodo 未开始 & 需硬件连接 PA9/PA10 \\
+    \hline
+    STM32 接收 & 接收文本并显示 & \tasktodo 未开始 & FreeRTOS 任务轮询 USART1 \\
+    \hline
+    示波器显示 & Terminal\_Print 调用 & \tasktodo 未开始 & 矢量字符仅支持 ASCII \\
     \hline
 \end{tabularx}
 \end{center}
 
+\vspace{10pt}
+
+\textbf{图例：}
+\quad {\color{success}$\blacksquare$} 已完成 \qquad
+{\color{warning}$\blacksquare$} 待修改 \qquad
+{\color{accent}$\blacksquare$} 有问题 \qquad
+{\color{graytext}$\blacksquare$} 未开始
+
 % ==========================================
-% 二、阶段任务
+% 三、已完成模块详细记录
 % ==========================================
-\chapter{阶段任务与达标要求}
+\chapter{已完成模块详细记录}
+
+包含关键实现细节和"坑"，方便后续排查。
+
+\section{麦克风驱动 INMP441}
+
+\subsection*{关键文件}
+\begin{itemize}
+    \item \texttt{lib/microphone/src/microphone.cpp} —— I2S 驱动封装
+    \item \texttt{include/config.h} —— 引脚定义
+\end{itemize}
+
+\subsection*{配置参数}
+\begin{verbatim}
+I2S 模式:      I2S_MODE_MASTER | I2S_MODE_RX
+采样率:        16000 Hz
+位深:          I2S_BITS_PER_SAMPLE_32BIT
+通道格式:      I2S_CHANNEL_FMT_ONLY_LEFT
+通信格式:      I2S_COMM_FORMAT_STAND_I2S
+DMA:           8 缓冲 × 256 样本
+引脚:          SCK=GPIO15, CLK=GPIO5, DATA=GPIO4, L/R=GND
+\end{verbatim}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item \taskfail \textbf{不能用 \texttt{I2S\_MODE\_PDM}}！INMP441 不是 PDM 数字麦克风，它输出标准 I2S 信号。误用 PDM 模式会读出全 0x8729 噪声。
+    \item 读取 32-bit 样本后右移 16 位得到 16-bit PCM：\texttt{(int16\_t)(temp[i] >> 16)}。
+    \item 采样率 16kHz，10 秒录音需 320KB 缓冲区。
+    \item \taskfail \textbf{废弃旧驱动} \texttt{lib/inmp441/} 使用了 \texttt{I2S\_MODE\_PDM}，不可用于此项目。当前使用的正确驱动是 \texttt{lib/microphone/src/}（标准 I2S RX 模式）。
+\end{itemize}
+
+\section{WiFi 联网}
+
+\subsection*{配置}
+\begin{verbatim}
+SSID:     Xiaomi 15 Pro
+Password: you3211231234
+模式:     WIFI_STA
+超时:     40次 × 500ms = 20秒
+\end{verbatim}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item 连接成功会打印 IP 地址（如 10.189.159.90）。
+    \item 无断线自动重连，断线后需手动输入 \texttt{w} 命令。
+\end{itemize}
+
+\section{百度语音识别 ASR}
+
+\subsection*{接口细节}
+\begin{description}
+    \item[Token 获取] POST \texttt{https://aip.baidubce.com/oauth/2.0/token}，缓存 29 天。
+    \item[语音识别] POST \texttt{https://vop.baidu.com/server\_api}，Content-Type: \texttt{audio/pcm;rate=16000}，dev\_pid=1537。
+    \item[数据格式] \textbf{裸 PCM 二进制}，不要 Base64。
+    \item[返回] 识别文本在 \texttt{result[0]} 中。
+\end{description}
+
+\section{DeepSeek 大语言模型}
+
+\subsection*{接口细节}
+\begin{verbatim}
+端点:     https://api.deepseek.com/chat/completions
+模型:     deepseek-v4-flash
+HTTP:     HTTP/1.0 (useHTTP10(true))
+超时:     连接10s, HTTP 30s
+\end{verbatim}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item \taskfail \textbf{地址不含 \texttt{/v1/}}。旧版 \texttt{/v1/chat/completions} 已迁移失效。
+    \item \texttt{deepseek-chat} 模型 2026/07/24 废弃，当前用 \texttt{deepseek-v4-flash}。
+    \item \taskfail \textbf{必须开 HTTP/1.0}，否则 \texttt{WiFiClientSecure::getString()} 在 chunked 编码时报错 \texttt{UNKNOWN ERROR CODE 004C}。
+\end{itemize}
+
+\section{全链路对话流程}
+
+\begin{enumerate}
+    \item 上电初始化：麦克风 $\rightarrow$ WiFi $\rightarrow$ 打印提示
+    \item 串口输入 \texttt{s} 触发录音
+    \item 录音中可再发 \texttt{s} 提前停止
+    \item 自动执行：录音 $\rightarrow$ 百度 ASR $\rightarrow$ DeepSeek $\rightarrow$ 串口输出
+\end{enumerate}
+
+已验证输出故事（"月光下的约定"、"最后一盏灯"等），中文回复偶尔乱码，改为英文后自然解决。
+
+% ==========================================
+% 四、待解决问题
+% ==========================================
+\chapter{待解决问题}
+
+\section{PSRAM 无法使用}
+
+\subsection*{现象}
+\begin{verbatim}
+E (208) psram: PSRAM ID read error: 0x00ffffff, PSRAM chip not found
+⚠️ PSRAM 未启用，录音时长受限
+\end{verbatim}
+
+\subsection*{分析}
+板载标注 2MB PSRAM，Boot log 也显示 ``Embedded PSRAM 8MB''，但初始化失败。尝试 \texttt{board\_build.psram\_mode = opi} 导致 boot crash（该板 Flash 是 Quad 模式）。
+
+\subsection*{当前状态}
+自动 fallback 到 \texttt{malloc()}。\texttt{config.h} 中 \texttt{MAX\_RECORD\_SEC=10} 写死，\texttt{start\_ai\_dialog()} 内检测 PSRAM 失败后降级到 5 秒上限。实测 5 秒录音(160KB) + HTTP 请求可能堆溢出崩溃。
+
+\subsection*{注意点}
+\begin{itemize}
+    \item 部分 N8R2 批次可能未焊接 PSRAM，需确认硬件。
+    \item 短期内将录音限至 3 秒可避免崩溃，但需修改代码硬限。
+\end{itemize}
+
+\section{StoreProhibited 崩溃}
+
+\subsection*{触发条件}
+录音 5 秒 + \texttt{baidu\_asr()} HTTP POST 时偶发。
+
+\subsection*{原因}
+\texttt{malloc(160KB)} 接近堆上限，HTTP 再申请内存时越界。
+
+\subsection*{解决办法}
+录音上限降至 3 秒（约 96KB），预留 HTTP 所需内存。
+
+% ==========================================
+% 五、阶段划分与任务清单
+% ==========================================
+\chapter{阶段划分与任务清单}
+
+% ---------------------------
+\section{第一阶段：ESP32 端适配（当前阶段）}
+
+\subsection*{当前阶段已完成}
+\begin{itemize}
+    \item[\taskdone] INMP441 I2S 驱动 (16kHz, 16bit, 单声道) — 使用 \texttt{lib/microphone/} 标准 I2S RX
+    \item[\taskdone] WiFi 联网
+    \item[\taskdone] 百度 ASR 集成 — 裸 PCM POST，dev\_pid=1537
+    \item[\taskdone] DeepSeek 集成 — HTTP/1.0，模型 deepseek-v4-flash
+    \item[\taskdone] 全链路：录音 $\to$ ASR $\to$ LLM $\to$ 输出
+\end{itemize}
+
+\subsection*{当前阶段未完成}
+\begin{itemize}
+    \item[\taskwarn] \textbf{修改 DeepSeek system prompt 为英文}
+    \begin{itemize}
+        \item 当前代码中 system prompt 为中文（\texttt{"你是一个有帮助的AI助手。请用简洁的中文回答用户的问题。"}）
+        \item 需改为纯英文 + ASCII（无中文、Emoji、特殊符号），限制输出长度（示波器 10--15 行）
+        \item 参见 \texttt{src/main.cpp} 中 \texttt{deepseek\_chat()} 函数的 \texttt{sys\_msg["content"]}
+    \end{itemize}
+
+    \item[\taskfail] \textbf{修复录音稳定性}
+    \begin{itemize}
+        \item \texttt{config.h} 中 \texttt{MAX\_RECORD\_SEC=10}（写死10秒），PSRAM 不可用时 fallback 到 5 秒
+        \item 需要：将上限硬限制为 3 秒（约 96KB），避免 \texttt{malloc(160KB)} 堆溢出触发 StoreProhibited
+        \item 当前 \texttt{start\_ai\_dialog()} 中已有 PSRAM fallback 逻辑但未硬限 3 秒
+    \end{itemize}
+
+    \item[\tasktodo] \textbf{添加 UART 输出}
+    \begin{itemize}
+        \item 使用 \texttt{HardwareSerial}（如 Serial1）初始化 UART，避免与 USB Serial 冲突
+        \item DeepSeek 回复同时输出到 USB Serial（调试）和 UART（送 STM32）
+        \item 波特率 115200，引脚避开 I2S 占用的 GPIO4/5/15
+        \item API：\texttt{Serial1.begin(115200, SERIAL\_8N1, RX\_PIN, TX\_PIN)}
+    \end{itemize}
+\end{itemize}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item PSRAM 不可用（ID 读取错误 0x00ffffff），所有 malloc 用普通堆内存。
+    \item 录音超过 3 秒（96KB）可能触发 StoreProhibited 崩溃，第一阶段必须限时。
+    \item UART 引脚避免与 I2S 冲突（I2S 用了 GPIO4/5/15），建议用 GPIO16(TX)/GPIO17(RX) 或 ESP32-S3 原生 GPIO43(TX)/GPIO44(RX)。
+    \item 修改 system prompt 为英文后，中文乱码问题自然消失（无需额外处理）。
+    \item ESP32-S3 上传端口固定为 COM9（USB-Serial/JTAG），蓝牙虚拟 COM 口不可用于上传。
+\end{itemize}
+
+% ---------------------------
+\section{第二阶段：STM32 端开发}
+
+\subsection*{任务}
+\begin{enumerate}[leftmargin=2em, label=\textbf{\arabic*.}]
+    \item \textbf{确认 USART1 硬件连接}
+    \begin{itemize}
+        \item ESP32 TX $\to$ STM32 PA10 (USART1 RX)
+        \item 共地
+        \item 波特率 115200, 8N1
+    \end{itemize}
+
+    \item \textbf{编写 UART 接收任务}
+    \begin{itemize}
+        \item FreeRTOS 任务 \texttt{vUartRxTask}
+        \item \texttt{HAL\_UART\_Receive\_IT()} 或 DMA 接收
+        \item 环形缓冲区存储字符
+    \end{itemize}
+
+    \item \textbf{文本分行与显示}
+    \begin{itemize}
+        \item 遇到 \texttt{\textbackslash n} 调用 \texttt{DRAW\_Terminal\_Print()}
+        \item 设置字号和行距
+        \item 长文本自动分页
+    \end{itemize}
+\end{enumerate}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item 矢量字符只支持 ASCII（A-Z, a-z, 0-9, 标点），不支持中文。
+    \item PA9/PA10 重映射需确认 GPIO\_AF7\_USART1。
+    \item 示波器 XY 模式需调高余晖/持久时间防止闪烁。
+\end{itemize}
+
+% ---------------------------
+\section{第三阶段：系统联调}
+
+\subsection*{任务}
+\begin{enumerate}[leftmargin=2em, label=\textbf{\arabic*.}]
+    \item 上下位机联合测试
+    \item 调整示波器显示效果（亮度、字号、位置）
+    \item 优化端到端延迟
+    \item 编写使用说明和硬件接线图
+\end{enumerate}
+
+\subsection*{注意点}
+\begin{itemize}
+    \item ESP32 录音 3s + ASR + LLM 总延迟约 3--5 秒，注意用户体验。
+    \item 示波器亮度低时文字可能看不清，适当调节。
+    \item 联调时先确保 UART 通信正常，再用示波器查看。
+\end{itemize}
+
+% ==========================================
+% 六、参考信息
+% ==========================================
+\chapter{参考信息}
+
+\section{文件清单}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.3}
 \begin{tabularx}{\textwidth}{|c|X|X|c|}
     \hline
-    \heiti 阶段 & \heiti 任务内容 & \heiti 达标要求 & \heiti 预计天数\\
+    \heiti 文件 & \heiti 功能 & \heiti 阶段 & \heiti 状态\\
     \hline
-    \textbf{一} & 环境搭建与基础外设驱动 & 见 \S 2.1 & 2 天\\
+    \texttt{AI\_Chat/src/main.cpp} & 主程序（录音、ASR、LLM） & 一 & \taskdone 已完成 \\
     \hline
-    \textbf{二} & Wi-Fi 联网与 API 通信 & 见 \S 2.2 & 2 天\\
+    \texttt{AI\_Chat/include/config.h} & 配置（WiFi、API、引脚） & 一 & \taskdone 已完成 \\
     \hline
-    \textbf{三} & 语音采集（硅麦驱动） & 见 \S 2.3 & 2 天\\
+    \texttt{AI\_Chat/lib/microphone/src/microphone.cpp} & INMP441 I2S 驱动（标准 I2S RX） & 一 & \taskdone 已完成 \\
     \hline
-    \textbf{四} & 语音播放（扬声器驱动） & 见 \S 2.4 & 1 天\\
+    \texttt{AI\_Chat/lib/microphone/src/microphone.h} & INMP441 驱动头文件 & 一 & \taskdone 已完成 \\
     \hline
-    \textbf{五} & 云端 ASR + LLM + TTS 集成 & 见 \S 2.5 & 3 天\\
+    \texttt{AI\_Chat/lib/inmp441/src/inmp441.cpp} & INMP441 PDM 驱动（\textbf{已废弃，勿用}） & 一 & \taskfail 废弃 \\
     \hline
-    \textbf{六} & 屏幕显示 & 见 \S 2.6 & 1 天\\
+    \texttt{AI\_Chat/lib/inmp441/src/inmp441.h} & PDM 驱动头文件（\textbf{已废弃，勿用}） & 一 & \taskfail 废弃 \\
     \hline
-    \textbf{七} & 无线手柄通信 & 见 \S 2.7 & 2 天\\
+    \texttt{AI\_Chat/platformio.ini} & PlatformIO 项目配置 & 一 & \taskdone 已完成 \\
     \hline
-    \textbf{八} & 系统联调与测试 & 见 \S 2.8 & 2 天\\
+    \texttt{AI\_Chat/项目文档/project.tex} & 本开发说明文档 & 全 & \taskdone 已完成 \\
+    \hline
+    \texttt{EDC\_407/...}（待创建） & STM32 工程（Keil MDK 项目） & 二 & \tasktodo 待创建 \\
     \hline
 \end{tabularx}
 \end{center}
 
-\vspace{10pt}
-\textbf{说明}：表格中天数为预估上限，实际进度以达标要求为准。
-
-\newpage
-\section{阶段一：环境搭建与基础外设驱动}
-\textbf{预估：2 天 \quad 优先级：$\star\star\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{1.\arabic*}]
-    \item \textbf{开发环境搭建}
-    \begin{itemize}[leftmargin=3em]
-        \item 安装 VS Code + PlatformIO 插件，或配置 Arduino IDE
-        \item 创建项目工程，配置 ESP32-S3 板级支持包
-        \item 配置串口调试工具（如 Putty 或 Arduino 串口监视器）
-    \end{itemize}
-    
-    \item \textbf{基础外设驱动}
-    \begin{itemize}[leftmargin=3em]
-        \item 点亮板载 LED，实现 Blink 例程
-        \item 驱动 OLED/LCD 屏幕，显示 "Hello World"
-        \item 测试按钮中断输入
-    \end{itemize}
-    
-    \item \textbf{FreeRTOS 任务框架搭建}
-    \begin{itemize}[leftmargin=3em]
-        \item 搭建多任务框架（语音采集任务、AI 处理任务、显示任务、手柄处理任务）
-        \item 实现任务间通信（队列/信号量）
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 编译、烧录、串口输出均正常
-    \item[{\color{success}$\checkmark$}] 屏幕能正常显示自定义文字
-    \item[{\color{success}$\checkmark$}] 能通过按钮触发中断并在串口输出日志
-    \item[{\color{success}$\checkmark$}] 多任务能同时运行且互不干扰
-\end{itemize}
-
-\newpage
-\section{阶段二：Wi-Fi 联网与 API 通信}
-\textbf{预估：2 天 \quad 优先级：$\star\star\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{2.\arabic*}]
-    \item \textbf{Wi-Fi 联网}
-    \begin{itemize}[leftmargin=3em]
-        \item 编写 Wi-Fi 连接代码（Station 模式）
-        \item 实现自动重连机制
-        \item 处理断网异常情况
-    \end{itemize}
-    
-    \item \textbf{HTTP/HTTPS 请求}
-    \begin{itemize}[leftmargin=3em]
-        \item 使用 \texttt{HTTPClient} 库发送 GET/POST 请求
-        \item 测试访问公共 API（如天气 API），验证联网通畅
-        \item 处理 JSON 响应（使用 \texttt{ArduinoJson} 库）
-    \end{itemize}
-    
-    \item \textbf{大模型 API 对接准备}
-    \begin{itemize}[leftmargin=3em]
-        \item 注册并获取 API Key（如讯飞星火、百度文心、阿里通义千问等）
-        \item 阅读 API 文档，确认请求格式和鉴权方式
-        \item 实现 HTTP POST 发送对话请求并接收回复
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] ESP32 能成功连接指定 Wi-Fi
-    \item[{\color{success}$\checkmark$}] 能发送 HTTP 请求并正确解析 JSON 响应
-    \item[{\color{success}$\checkmark$}] 能调用大模型 API 并获取文本回复（可先用串口打印验证）
-\end{itemize}
-
-\newpage
-\section{阶段三：语音采集（硅麦驱动）}
-\textbf{预估：2 天 \quad 优先级：$\star\star\star\star\star$}
-
-这是当前任务的\textbf{核心难点}，需要重点关注。
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{3.\arabic*}]
-    \item \textbf{硬件连接}
-    \begin{itemize}[leftmargin=3em]
-        \item 确认硅麦引脚定义（DATA、CLK、L/R、VDD、GND）
-        \item 连接至 ESP32-S3 的 I2S 接口
-        \item \texttt{注意：ESP32-S3 的 I2S 引脚与经典 ESP32 有所不同，务必查阅引脚定义表}
-    \end{itemize}
-    
-    \item \textbf{I2S 驱动配置}
-    \begin{itemize}[leftmargin=3em]
-        \item 使用 ESP-IDF 的 \texttt{I2S} 驱动库或 Arduino 的 \texttt{I2SSampler} 库
-        \item 配置采样率（建议 16kHz）、位深（16bit）、通道数（单声道）
-        \item 配置 PDM 模式（硅麦通常是 PDM 输出）
-    \end{itemize}
-    
-    \item \textbf{音频数据读取}
-    \begin{itemize}[leftmargin=3em]
-        \item 从 I2S 接口读取 PDM 音频数据
-        \item 将 PDM 数据转换为 PCM 数据（软件解码）
-        \item 将音频数据缓存到内存中（使用环形缓冲区）
-    \end{itemize}
-    
-    \item \textbf{录音控制逻辑}
-    \begin{itemize}[leftmargin=3em]
-        \item 实现按键触发录音（按下开始、松开停止）
-        \item 或实现 VAD（语音活动检测），自动检测说话开始和结束
-        \item 录音完成后生成 WAV 文件头（或直接裸音频数据），准备上传
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 能通过硅麦采集到音频数据，串口打印出数值（有声音时数据明显变化）
-    \item[{\color{success}$\checkmark$}] 能录制一段语音并保存为 WAV 格式（或裸 PCM 数据）
-    \item[{\color{success}$\checkmark$}] 录制音频能通过 PC 播放验证（导出到电脑后可听）
-\end{itemize}
-
-\subsubsection*{参考代码结构}
-\begin{verbatim}
-// I2S 配置（PDM 模式）
-i2s_config_t i2s_config = {
-    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM),
-    .sample_rate = 16000,
-    .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
-    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
-    .communication_format = I2S_COMM_FORMAT_STAND_I2S,
-    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
-    .dma_buf_count = 8,
-    .dma_buf_len = 256,
-};
-\end{verbatim}
-
-\newpage
-\section{阶段四：语音播放（扬声器驱动）}
-\textbf{预估：1 天 \quad 优先级：$\star\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{4.\arabic*}]
-    \item \textbf{I2S 扬声器驱动}
-    \begin{itemize}[leftmargin=3em]
-        \item 连接 MAX98357（或类似 I2S 功放模块）至 ESP32-S3
-        \item 配置 I2S 为 TX（输出）模式
-        \item 播放预置的音频数据（如简单的提示音）
-    \end{itemize}
-    
-    \item \textbf{TTS 音频播放}
-    \begin{itemize}[leftmargin=3em]
-        \item 接收云端返回的 TTS 音频数据（MP3 或 PCM）
-        \item 若为 MP3，需使用 \texttt{ESP8266Audio} 或类似库解码
-        \item 通过 I2S 扬声器播放
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 扬声器能正常播放提示音或音频文件
-    \item[{\color{success}$\checkmark$}] 能播放云端返回的 TTS 语音回复
-    \item[{\color{success}$\checkmark$}] 音质清晰可辨
-\end{itemize}
-
-\newpage
-\section{阶段五：云端 ASR + LLM + TTS 集成}
-\textbf{预估：3 天 \quad 优先级：$\star\star\star\star\star$}
-
-这是 AI 对话的核心逻辑链，需要把三个阶段二–四打通。
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{5.\arabic*}]
-    \item \textbf{云端服务选型}
-    \begin{itemize}[leftmargin=3em]
-        \item 确定语音识别（ASR）服务：如讯飞语音听写、百度语音识别、阿里语音识别
-        \item 确定大语言模型（LLM）服务：如讯飞星火、百度文心一言、阿里通义千问、DeepSeek
-        \item 确定语音合成（TTS）服务：如讯飞 TTS、百度 TTS、Edge TTS
-        \item \textbf{推荐选型方案见下表}
-    \end{itemize}
-    
-    \item \textbf{ASR 集成}
-    \begin{itemize}[leftmargin=3em]
-        \item 将阶段三录制的音频数据通过 HTTP POST 发送至 ASR 接口
-        \item 解析返回的识别文本
-        \item 处理好超时和错误情况
-    \end{itemize}
-    
-    \item \textbf{LLM 集成}
-    \begin{itemize}[leftmargin=3em]
-        \item 将 ASR 识别文本作为 Prompt 发送至大模型 API
-        \item 设置系统提示词（System Prompt），定义 AI 角色
-        \item 解析返回的回复文本
-    \end{itemize}
-    
-    \item \textbf{TTS 集成}
-    \begin{itemize}[leftmargin=3em]
-        \item 将 LLM 回复文本发送至 TTS 接口
-        \item 接收返回的音频数据（MP3 或 PCM）
-        \item 传递给阶段四的播放模块
-    \end{itemize}
-    
-    \item \textbf{完整对话流程串联}
-    \begin{itemize}[leftmargin=3em]
-        \item 按下按键 $\rightarrow$ 录音 $\rightarrow$ ASR $\rightarrow$ LLM $\rightarrow$ TTS $\rightarrow$ 播放 $\rightarrow$ 等待下一次输入
-        \item 在串口和屏幕上显示每个环节的状态
-        \item 加入超时保护和错误重试机制
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{云端服务推荐方案}
+\section{API 凭据}
 
 \begin{center}
 \renewcommand{\arraystretch}{1.3}
-\begin{tabularx}{\textwidth}{|c|X|X|X|}
+\begin{tabularx}{\textwidth}{|c|X|c|}
     \hline
-    \heiti 环节 & \heiti 推荐服务 & \heiti 优势 & \heiti 注意\\
+    \heiti 服务 & \heiti 凭据 & \heiti 说明\\
     \hline
-    ASR & 讯飞语音听写 & 识别准确率高，支持中文 & 需要申请 AppID\\
+    百度 ASR & AppID: 7825090 & 已在 token 中缓存 \\
     \hline
-    ASR & 百度语音识别 & 免费额度多 & 文档完善\\
+    百度 ASR & API Key: LVZcNhtn584JqOPB9UCsBE4H & — \\
     \hline
-    LLM & DeepSeek API & 性价比高，响应快 & 国内可直连\\
+    百度 ASR & Secret Key: QpoVPPhETyWK7yLC8L2TLRzrSBALASG3 & — \\
     \hline
-    LLM & 阿里通义千问 & 免费额度充足 & 兼容 OpenAI 格式\\
-    \hline
-    TTS & Edge TTS (免费) & 免费，语音自然 & 需要 HTTP 请求模拟\\
-    \hline
-    TTS & 讯飞 TTS & 多音色可选 & 需要付费\\
+    DeepSeek & API Key: sk-717fd68ac7964fcabd7733cf8917f5a8 & 余额请自行检查 \\
     \hline
 \end{tabularx}
 \end{center}
 
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 按住按钮说话 $\rightarrow$ 松开后 $\rightarrow$ 屏幕显示识别文字 $\rightarrow$ 显示 AI 回复 $\rightarrow$ 扬声器播放语音
-    \item[{\color{success}$\checkmark$}] 整个闭环能在 5 秒内完成（取决于网络和 API 速度）
-    \item[{\color{success}$\checkmark$}] 能稳定连续对话 3 轮以上不出错
-\end{itemize}
-
-\newpage
-\section{阶段六：屏幕显示}
-\textbf{预估：1 天 \quad 优先级：$\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{6.\arabic*}]
-    \item \textbf{屏幕 UI 设计}
-    \begin{itemize}[leftmargin=3em]
-        \item 设计对话界面：显示"识别中…""AI 回复：XXX"等
-        \item 设计手柄状态界面：显示连接状态、PWM 值等
-        \item 实现多页切换（对话页 / 手柄状态页）
-    \end{itemize}
-    
-    \item \textbf{中文显示}
-    \begin{itemize}[leftmargin=3em]
-        \item 生成中文字库（取模工具如 PCtoLCD2002）
-        \item 实现 UTF-8 到 GB2312 的编码转换（如有必要）
-        \item 确保屏幕能正确渲染中文对话内容
-    \end{itemize}
-    
-    \item \textbf{滚动显示}
-    \begin{itemize}[leftmargin=3em]
-        \item 当文字超出一屏时，实现自动滚动或翻页
-        \item 显示对话历史记录
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 屏幕能正确显示中文对话内容
-    \item[{\color{success}$\checkmark$}] 能显示手柄连接状态和 PWM 数值
-    \item[{\color{success}$\checkmark$}] 文字超长时能滚动/翻页显示完全
-\end{itemize}
-
-\newpage
-\section{阶段七：无线手柄通信}
-\textbf{预估：2 天 \quad 优先级：$\star\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{7.\arabic*}]
-    \item \textbf{手柄端（发射端）开发}
-    \begin{itemize}[leftmargin=3em]
-        \item 使用第二块 ESP32（或 ESP8266）作为手柄
-        \item 读取摇杆/按键的模拟值和数字值
-        \item 通过 Wi-Fi UDP 发送控制数据包
-    \end{itemize}
-    
-    \item \textbf{接收端开发}
-    \begin{itemize}[leftmargin=3em]
-        \item ESP32-S3 作为 UDP 服务器，监听手柄数据
-        \item 解析数据包，提取控制指令
-        \item 将指令转发至 PWM 显示器
-    \end{itemize}
-    
-    \item \textbf{通信协议设计}
-    \begin{itemize}[leftmargin=3em]
-        \item 定义数据包格式（建议使用结构化数据）
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{数据包格式参考}
-\begin{verbatim}
-// 手柄数据包结构（建议 6 字节）
-| Byte 0    | Byte 1    | Byte 2-3   | Byte 4-5   |
-|-----------|-----------|------------|------------|
-| 帧头 0xAA | 指令类型  | PWM 通道 1 | PWM 通道 2 |
-
-指令类型：
-  0x01 → 设置 PWM 值
-  0x02 → 读取状态
-  0x03 → 心跳包
-\end{verbatim}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] 手柄端能发送控制指令，接收端能正确接收
-    \item[{\color{success}$\checkmark$}] 通信延迟 \textless 100ms（同一局域网内）
-    \item[{\color{success}$\checkmark$}] 手柄能稳定控制 PWM 显示器输出
-\end{itemize}
-
-\newpage
-\section{阶段八：系统联调与测试}
-\textbf{预估：2 天 \quad 优先级：$\star\star\star\star$}
-
-\subsubsection*{子任务清单}
-
-\begin{enumerate}[leftmargin=2em, label=\textbf{8.\arabic*}]
-    \item \textbf{全功能联调}
-    \begin{itemize}[leftmargin=3em]
-        \item AI 对话 + 手柄控制同时运行
-        \item 测试任务间资源竞争和优先级问题
-        \item 优化内存使用（ESP32-S3 的 PSRAM 分配）
-    \end{itemize}
-    
-    \item \textbf{异常处理}
-    \begin{itemize}[leftmargin=3em]
-        \item Wi-Fi 断线自动重连
-        \item API 调用超时处理
-        \item 录音失败/播放失败容错
-    \end{itemize}
-    
-    \item \textbf{性能优化}
-    \begin{itemize}[leftmargin=3em]
-        \item 降低端到端对话延迟
-        \item 优化音频缓冲区大小，减少卡顿
-        \item 检查内存泄漏
-    \end{itemize}
-    
-    \item \textbf{文档整理}
-    \begin{itemize}[leftmargin=3em]
-        \item 整理完整代码结构和注释
-        \item 编写 README 说明文档（硬件接线图、API 配置方法）
-        \item 整理 BOM 物料清单
-    \end{itemize}
-\end{enumerate}
-
-\subsubsection*{达标要求}
-\begin{itemize}
-    \item[{\color{success}$\checkmark$}] AI 对话和手柄控制能同时稳定运行
-    \item[{\color{success}$\checkmark$}] 断网后能自动恢复连接
-    \item[{\color{success}$\checkmark$}] 连续运行 30 分钟无崩溃
-    \item[{\color{success}$\checkmark$}] 文档完整，后续人员能按文档复现
-\end{itemize}
-
-% ==========================================
-% 三、总体时间线
-% ==========================================
-\chapter{总体时间线}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.6}
-\begin{tabularx}{\textwidth}{|c|c|c|X|}
-    \hline
-    \heiti 天次 & \heiti 阶段 & \heiti 优先级 & \heiti 任务\\
-    \hline
-    第 1--2 天 & 一 & 最高 & 环境搭建、基础外设驱动\\
-    \hline
-    第 3--4 天 & 二 & 最高 & Wi-Fi 联网、API 通信\\
-    \hline
-    第 5--6 天 & 三 & 最高 & \textbf{硅麦驱动与语音采集}\\
-    \hline
-    第 7 天 & 四 & 高 & I2S 扬声器驱动\\
-    \hline
-    第 8--10 天 & 五 & 最高 & \textbf{ASR + LLM + TTS 集成}\\
-    \hline
-    第 11 天 & 六 & 中 & 屏幕显示 UI\\
-    \hline
-    第 12--13 天 & 七 & 高 & 无线手柄通信\\
-    \hline
-    第 14--15 天 & 八 & 高 & 联调、测试、文档\\
-    \hline
-\end{tabularx}
-\end{center}
-
-\vspace{10pt}
-\textbf{备注}：阶段三（语音采集）和阶段五（AI 集成）是此项目的核心难点，建议优先投入精力攻克。无线手柄部分可在 AI 对话功能稳定后再开展。
-
-% ==========================================
-% 四、关键难点与风险
-% ==========================================
-\chapter{关键难点与风险提示}
-
-\section{技术难点}
+\section{已知风险}
 
 \begin{enumerate}[leftmargin=2em]
-    \item \textbf{PDM 麦克风驱动}——ESP32-S3 的 I2S 在 PDM 模式下配置较为复杂，DMA 缓冲区大小和采样率需要反复调试。建议先用 Arduino 的 I2S 库跑通基础采集，再考虑性能优化。
-    \item \textbf{音频数据上传}——WAV 文件较大（16kHz $\times$ 16bit $\approx$ 32KB/s），ESP32 内存有限，需合理分片上传或流式上传（Chunked Transfer）。
-    \item \textbf{端到端延迟}——录音 $\rightarrow$ ASR $\rightarrow$ LLM $\rightarrow$ TTS $\rightarrow$ 播放，每个环节都会引入延迟。整体控制在 3--5 秒内为佳。
-    \item \textbf{内存管理}——ESP32-S3 虽然有 PSRAM，但多个任务同时运行（Wi-Fi、I2S、显示、手柄）时要注意栈空间分配。
+    \item \textbf{PSRAM}：部分 N8R2 板子 PSRAM 可能未焊接。若始终不可用，录音必须 $\le$ 3 秒。
+    \item \textbf{API 费用}：百度 ASR 有免费额度，DeepSeek 按 token 计费。
+    \item \textbf{模型变更}：DeepSeek 模型名可能更新（\texttt{deepseek-chat} 2026/07/24 废弃），关注官方公告。
+    \item \textbf{示波器闪烁}：矢量扫描需调高 XY 模式余晖时间。
+    \item \textbf{波特率一致}：ESP32 与 STM32 UART 必须同为 115200。
+    \item \textbf{上传端口抖动}：ESP32-S3 上电后 USB-Serial/JTAG 端口可能变化。如上传失败，按 RST 键重试或重新插拔 USB。
+    \item \textbf{旧驱动混淆}：\texttt{lib/inmp441/} 目录包含废弃的 PDM 驱动，编辑时注意不要误引。
 \end{enumerate}
-
-\section{风险与应对}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|c|X|X|}
-    \hline
-    \heiti 风险 & \heiti 影响 & \heiti 应对措施\\
-    \hline
-    ASR 识别率低 & 对话体验差 & 先测试不同 ASR 服务，选用最合适的\\
-    \hline
-    API 请求超时 & 对话中断 & 加入超时重试机制，设置合理超时阈值\\
-    \hline
-    硅麦采集失败 & 无法输入语音 & 先用手头的 USB 麦克风在 PC 端做 ASR 测试，验证云端链路再调试硬件\\
-    \hline
-    Wi-Fi 不稳定 & 对话/手柄中断 & 加入自动重连，界面显示连接状态\\
-    \hline
-    扬声器音量小 & 听不清回复 & 检查功放模块供电和增益设置\\
-    \hline
-\end{tabularx}
-\end{center}
-
-% ==========================================
-% 五、附录
-% ==========================================
-\chapter{附录}
-
-\section{推荐参考资源}
-
-\begin{itemize}[leftmargin=2em]
-    \item ESP32-S3 技术参考手册（乐鑫官方）
-    \item Arduino-ESP32 I2S 文档：\texttt{https://docs.espressif.com/projects/arduino-esp32/}
-    \item PlatformIO 官方文档：\texttt{https://platformio.org/}
-    \item 讯飞开放平台语音识别 API 文档
-    \item DeepSeek API 文档：\texttt{https://platform.deepseek.com/}
-    \item Edge TTS 非官方 API：\texttt{https://github.com/rany2/edge-tts}
-\end{itemize}
-
-\section{硬件接线参考}
-
-\subsection*{硅麦（PDM）$\rightarrow$ ESP32-S3}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|c|X|X|}
-    \hline
-    \heiti 硅麦引脚 & \heiti 说明 & \heiti ESP32-S3 引脚（示例）\\
-    \hline
-    DATA & PDM 数据输出 & GPIO 4 (I2S\_IN\_D0)\\
-    \hline
-    CLK & PDM 时钟输入 & GPIO 5 (I2S\_BCK)\\
-    \hline
-    VDD & 电源正极 & 3.3V\\
-    \hline
-    GND & 电源地 & GND\\
-    \hline
-    L/R & 声道选择 & GND（左声道）/ 3.3V（右声道）\\
-    \hline
-\end{tabularx}
-\end{center}
-
-\subsection*{I2S 功放 $\rightarrow$ ESP32-S3}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|c|X|X|}
-    \hline
-    \heiti MAX98357 引脚 & \heiti 说明 & \heiti ESP32-S3 引脚（示例）\\
-    \hline
-    BCLK & I2S 位时钟 & GPIO 6\\
-    \hline
-    LRC & 左右声道时钟 & GPIO 7\\
-    \hline
-    DIN & I2S 数据输入 & GPIO 8\\
-    \hline
-    VIN & 电源正极 & 5V\\
-    \hline
-    GND & 电源地 & GND\\
-    \hline
-\end{tabularx}
-\end{center}
-
-\subsection*{OLED 屏幕 $\rightarrow$ ESP32-S3}
-
-\begin{center}
-\renewcommand{\arraystretch}{1.4}
-\begin{tabularx}{\textwidth}{|c|X|X|}
-    \hline
-    \heiti OLED 引脚 & \heiti 说明 & \heiti ESP32-S3 引脚（示例）\\
-    \hline
-    SDA & I2C 数据 & GPIO 1\\
-    \hline
-    SCL & I2C 时钟 & GPIO 2\\
-    \hline
-    VCC & 电源正极 & 3.3V\\
-    \hline
-    GND & 电源地 & GND\\
-    \hline
-\end{tabularx}
-\end{center}
-
-\vspace{20pt}
-\begin{center}
-\color{graytext}\kaishu --- 文档结束 ---
-\end{center}
 
 \end{document}
