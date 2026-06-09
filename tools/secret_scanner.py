@@ -37,39 +37,39 @@ from typing import List, Tuple, Optional
 # 每条规则: (名称, 正则, 严重级别, 说明)
 # 严重级别: critical / high / medium / low
 SCAN_RULES = [
-    # --- 私钥（最高优先级）---
-    ("私钥文件",
+    # --- Private keys ---
+    ("Private Key",
      r"-----BEGIN\s+(RSA\s+|EC\s+|DSA\s+|OPENSSH\s+)?PRIVATE\s+KEY-----",
      "critical",
-     "私钥文件内容！任何人拿到即可冒充你的身份"),
+     "Private key content - someone can impersonate you"),
 
     # --- AI API Keys ---
     ("DeepSeek / OpenAI API Key",
      r"sk-[A-Za-z0-9]{20,}",
      "high",
-     "DeepSeek 或 OpenAI 的 API Key，可被用来调用付费接口"),
+     "AI service API key - could be used to call paid APIs"),
 
-    ("百度 API 凭证",
+    ("Baidu API Credentials",
      r"(BAIDU_API_KEY|BAIDU_SECRET_KEY|BAIDU_APP_ID)\s*[=:]\s*[\"']?[A-Za-z0-9_\-]{8,}",
      "high",
-     "百度智能云的 API 凭证，可被用来调用语音识别等服务"),
+     "Baidu Cloud API credentials - could be used for paid services"),
 
-    # --- 通用凭证 ---
-    ("通用 API Key",
+    # --- Generic credentials ---
+    ("Generic API Key",
      r"(?<!\.)(?:api[_-]?key|apikey)\s*[=:]\s*[\"']?[A-Za-z0-9_\-/+=]{16,}",
      "high",
-     "API Key 赋值语句，可能暴露云服务凭证"),
+     "API key assignment - may expose cloud service credentials"),
 
-    ("通用 Secret Key",
+    ("Generic Secret Key",
      r"(?<!\.)(?:secret[_-]?key|secretkey)\s*[=:]\s*[\"']?[A-Za-z0-9_\-/+=]{8,}",
      "high",
-     "Secret Key 赋值语句"),
+     "Secret key assignment"),
 
-    # --- Token ---
+    # --- Tokens ---
     ("GitHub Token",
      r"gh[ps]_[A-Za-z0-9]{36,}",
      "high",
-     "GitHub Personal Access Token，可访问你的代码仓库"),
+     "GitHub Personal Access Token - can access your repos"),
 
     ("GitLab Token",
      r"glpat-[A-Za-z0-9\-_]{20,}",
@@ -84,45 +84,45 @@ SCAN_RULES = [
     ("JWT Token",
      r"eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}",
      "medium",
-     "JWT Token，可能包含身份验证信息"),
+     "JWT token - may contain auth info"),
 
-    ("通用 Access Token",
+    ("Generic Access Token",
      r"(?<!\.)(?:access[_-]?token|auth[_-]?token)\s*[=:]\s*[\"']?[A-Za-z0-9_\-]{20,}",
      "high",
-     "Access Token 或 Auth Token"),
+     "Access token or auth token"),
 
     ("Bearer Token",
      r"(?i)(?:Authorization|Bearer)\s*[=:]\s*[\"']?Bearer\s+[A-Za-z0-9_\-\.]{20,}",
      "high",
-     "HTTP Authorization Bearer Token"),
+     "HTTP Authorization Bearer token"),
 
-    # --- 密码 ---
-    ("密码明文",
+    # --- Passwords ---
+    ("Plain Text Password",
      r"(?<!\.)(?:password|passwd|pwd)\s*[=:]\s*[\"']?(?!\s*(?:true|false|yes|no|null|none|0|1)\s*$)[^\"';\s]{6,}",
      "high",
-     "密码明文字段，请使用环境变量替代"),
+     "Plain text password - use environment variables instead"),
 
-    ("WiFi 密码",
+    ("WiFi Password",
      r"(?<!\.)(?:wifi[_-]?(?:password|psk|key))\s*[=:]\s*[\"']?[^\"';\s]{6,}",
      "high",
-     "WiFi 密码，暴露家庭/办公网络"),
+     "WiFi password - exposes home/office network"),
 
     ("WiFi SSID",
      r"(?<!\.)(?:wifi[_-]?ssid|ssid)\s*[=:]\s*[\"']?[A-Za-z0-9_\- ]{4,}",
      "medium",
-     "WiFi SSID（网络名称），可能暴露位置信息"),
+     "WiFi SSID (network name) - may expose location info"),
 
-    # --- 云服务 ---
+    # --- Cloud services ---
     ("AWS Access Key",
      r"AKIA[0-9A-Z]{16}",
      "high",
-     "AWS Access Key，可能产生云服务计费"),
+     "AWS Access Key - may incur cloud service charges"),
 
-    # --- 数据库 ---
-    ("数据库连接串",
+    # --- Databases ---
+    ("Database Connection String",
      r"(mongodb|postgresql|mysql|redis|rediss)://[A-Za-z0-9_\-%]+:[^@]{3,}@",
      "high",
-     "数据库连接字符串，包含用户名和密码"),
+     "Database connection string with username and password"),
 ]
 
 # 白名单模式：匹配这些的行会被跳过（防止误报示例代码）
@@ -388,7 +388,7 @@ class SecretScanner:
 def format_results(results: List[dict], verbose: bool = False) -> str:
     """格式化扫描结果为人类可读的文本"""
     if not results:
-        return "✅ 未发现敏感信息，安全！"
+        return "[OK] No secrets found. Safe!"
 
     # 按严重级别统计
     counts = {"critical": 0, "high": 0, "medium": 0, "low": 0, "error": 0}
@@ -399,22 +399,22 @@ def format_results(results: List[dict], verbose: bool = False) -> str:
     has_blocker = any(counts[s] > 0 for s in ("critical", "high"))
 
     if has_blocker:
-        lines.append(f"🔴 发现 {len(results)} 处敏感信息，已阻止操作！\n")
+        lines.append(f"[!] Found {len(results)} secrets, operation blocked!\n")
     else:
-        lines.append(f"🟡 发现 {len(results)} 处警告（非严重级别）\n")
+        lines.append(f"[?] Found {len(results)} warnings (non-blocking)\n")
 
     # 严重级别统计
     parts = []
     if counts["critical"]:
-        parts.append(f"🔥 {counts['critical']} 个致命")
+        parts.append(f"[CRIT] {counts['critical']} critical")
     if counts["high"]:
-        parts.append(f"🔴 {counts['high']} 个高危")
+        parts.append(f"[HIGH] {counts['high']} high")
     if counts["medium"]:
-        parts.append(f"🟡 {counts['medium']} 个中危")
+        parts.append(f"[MED]  {counts['medium']} medium")
     if counts["low"]:
-        parts.append(f"🟢 {counts['low']} 个低危")
+        parts.append(f"[LOW]  {counts['low']} low")
     if counts["error"]:
-        parts.append(f"❌ {counts['error']} 个错误")
+        parts.append(f"[ERR]  {counts['error']} errors")
     if parts:
         lines.append("  " + " | ".join(parts) + "\n")
 
@@ -427,32 +427,31 @@ def format_results(results: List[dict], verbose: bool = False) -> str:
         if not file_path:
             continue
         display_path = os.path.relpath(file_path) if os.path.exists(file_path) else file_path
-        lines.append(f"\n📄 {display_path}")
+        lines.append(f"\n  --- {display_path} ---")
 
         for item in items:
             severity_mark = {
-                "critical": "🔥",
-                "high": "🔴",
-                "medium": "🟡",
-                "low": "🟢",
-                "error": "❌",
-            }.get(item.get("severity", ""), "⚪")
+                "critical": "[CRIT]",
+                "high": "[HIGH]",
+                "medium": "[MED]",
+                "low": "[LOW]",
+                "error": "[ERR]",
+            }.get(item.get("severity", ""), "[INFO]")
 
             line_info = f" L{item['line']:4d}" if item.get("line", 0) > 0 else "      "
             lines.append(
-                f"  {severity_mark}{line_info} | [{item['severity'].upper()}] "
-                f"{item['rule']}"
+                f"  {severity_mark}{line_info} | {item['rule']}"
             )
             if verbose:
-                lines.append(f"          📝 {item.get('description', '')}")
-            lines.append(f"          🔑 {item.get('match', '')}")
+                lines.append(f"          {item.get('description', '')}")
+            lines.append(f"          => {item.get('match', '')}")
 
     lines.append("\n" + "=" * 60)
     if has_blocker:
-        lines.append("🚫 操作已阻止！请移除上述敏感信息后重试。")
-        lines.append("💡 建议：将密钥移到环境变量或 .env 文件中。")
+        lines.append("[!] Operation blocked! Remove sensitive data above and retry.")
+        lines.append("[*] Tip: Move secrets to environment variables or .env files.")
     else:
-        lines.append("💡 建议：检查上述中低危项，确认无误后仍可继续。")
+        lines.append("[*] Tip: Review the warnings above. Safe to proceed if acceptable.")
 
     return "\n".join(lines)
 
@@ -476,31 +475,31 @@ def format_json(results: List[dict]) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Secret Guardian - 敏感信息扫描器 v1.0",
+        description="Secret Guardian - Secret Scanner v1.0",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-示例:
-  %(prog)s scan config.py src/main.cpp     # 扫描指定文件
-  %(prog)s scan-tools/                     # 扫描 tools/ 目录
-  %(prog)s pre-commit                       # 扫描 Git 暂存区
-  %(prog)s pre-push                         # 扫描 Git 推送内容
-  %(prog)s --json scan config.py            # JSON 格式输出
-  %(prog)s --verbose scan config.py         # 显示详细描述
+Examples:
+  %(prog)s scan config.py src/main.cpp     # Scan specific files
+  %(prog)s scan tools/                     # Scan directory
+  %(prog)s pre-commit                       # Scan git staged area
+  %(prog)s pre-push                         # Scan git push content
+  %(prog)s --json scan config.py            # JSON output
+  %(prog)s --verbose scan config.py         # Verbose output
         """,
     )
     parser.add_argument(
         "mode", nargs="?", default="scan",
         choices=["scan", "pre-commit", "pre-push", "install-hook"],
-        help="扫描模式 (默认: scan)",
+        help="Scan mode (default: scan)",
     )
-    parser.add_argument("files", nargs="*", help="要扫描的文件或目录 (scan 模式)")
-    parser.add_argument("-v", "--verbose", action="store_true", help="显示详细信息")
-    parser.add_argument("--json", action="store_true", help="以 JSON 格式输出")
-    parser.add_argument("--config", help="自定义规则配置文件路径")
+    parser.add_argument("files", nargs="*", help="Files or dirs to scan (scan mode)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--json", action="store_true", help="JSON output")
+    parser.add_argument("--config", help="Custom rules config file")
     parser.add_argument(
         "--hook-dir",
         default=None,
-        help="Git 钩子安装目录 (install-hook 模式)",
+        help="Git hook install dir (install-hook mode)",
     )
 
     args = parser.parse_args()
@@ -543,14 +542,14 @@ def main():
     elif args.mode == "pre-commit":
         results = scanner.scan_git_staged()
         if not results:
-            print("✅ 暂存区未发现敏感信息")
+            print("No secrets found in staged files. Safe!")
             sys.exit(0)
 
     # --- Git pre-push 模式 ---
     elif args.mode == "pre-push":
         results = scanner.scan_git_push()
         if not results:
-            print("✅ 推送内容未发现敏感信息")
+            print("No secrets found in push content. Safe!")
             sys.exit(0)
 
     # --- 安装钩子模式 ---
@@ -580,8 +579,8 @@ def main():
 
 def install_hooks(target_dir: Optional[str] = None) -> None:
     r"""
-    安装 Git 钩子到指定目录（全局钩子）
-    如果 target_dir 为 None，使用默认全局位置 ~\.secret-guardian\git-hooks\
+    Install git hooks to target dir (global hooks)
+    If target_dir is None, use default ~\.secret-guardian\git-hooks\
     """
     if target_dir is None:
         target_dir = os.path.expanduser("~/.secret-guardian/git-hooks")
@@ -592,27 +591,55 @@ def install_hooks(target_dir: Optional[str] = None) -> None:
     # 获取本脚本的路径
     script_path = os.path.abspath(__file__)
 
+    # Git for Windows (MSYS2) 可以执行 shell 脚本作为钩子
+    # 使用 /bin/sh shebang 确保兼容性
     hooks = {
-        "pre-commit": f"""@echo off
+        "pre-commit": f"""#!/bin/sh
+# Secret Guardian - Pre-commit hook
+echo "[Secret Guardian] Scanning staged files..."
+PYTHONIOENCODING=utf-8 python "{script_path}" pre-commit
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "[!] Secret Guardian: Sensitive info detected, commit blocked!"
+    echo "[*] To skip check: git commit --no-verify"
+    exit 1
+fi
+exit 0
+""",
+        "pre-push": f"""#!/bin/sh
+# Secret Guardian - Pre-push hook
+echo "[Secret Guardian] Scanning push content..."
+PYTHONIOENCODING=utf-8 python "{script_path}" pre-push
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "[!] Secret Guardian: Sensitive info detected, push blocked!"
+    echo "[*] To skip check: git push --no-verify"
+    exit 1
+fi
+exit 0
+""",
+        "pre-commit.bat": f"""@echo off
 REM Secret Guardian - Pre-commit hook
-echo 🔍 Secret Guardian: 正在扫描暂存区...
+echo [Secret Guardian] Scanning staged files...
+set PYTHONIOENCODING=utf-8
 python "{script_path}" pre-commit
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo 🔴 敏感信息被检测到！提交已阻止。
-    echo 如果要忽略检查强制提交，请使用: git commit --no-verify
+    echo [!] Secret Guardian: Sensitive info detected, commit blocked!
+    echo [*] To skip check: git commit --no-verify
     exit /b 1
 )
 exit /b 0
 """,
-        "pre-push": f"""@echo off
+        "pre-push.bat": f"""@echo off
 REM Secret Guardian - Pre-push hook
-echo 🔍 Secret Guardian: 正在扫描推送内容...
+echo [Secret Guardian] Scanning push content...
+set PYTHONIOENCODING=utf-8
 python "{script_path}" pre-push
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo 🔴 敏感信息被检测到！推送已阻止。
-    echo 如果要忽略检查强制推送，请使用: git push --no-verify
+    echo [!] Secret Guardian: Sensitive info detected, push blocked!
+    echo [*] To skip check: git push --no-verify
     exit /b 1
 )
 exit /b 0
@@ -621,32 +648,30 @@ exit /b 0
 
     for hook_name, hook_content in hooks.items():
         hook_path = hook_dir / hook_name
-        # Windows 上使用 .bat 扩展名更可靠
-        # 但 Git 钩子需要无扩展名的文件名，所以直接写文件
         with open(hook_path, "w", encoding="utf-8") as f:
             f.write(hook_content)
-        print(f"  ✅ 已创建: {hook_path}")
+        print(f"  [OK] Created: {hook_path}")
 
-    # 同时生成 PowerShell 版本（更强大的钩子）
+    # 同时生成 PowerShell 版本（供手动使用）
     ps_hooks = {
         "pre-commit.ps1": f"""# Secret Guardian - Pre-commit hook (PowerShell)
-Write-Host "🔍 Secret Guardian: 正在扫描暂存区..." -ForegroundColor Cyan
+Write-Host "[Secret Guardian] Scanning staged files..." -ForegroundColor Cyan
 python "{script_path}" pre-commit
 if ($LASTEXITCODE -ne 0) {{
     Write-Host ""
-    Write-Host "🔴 敏感信息被检测到！提交已阻止。" -ForegroundColor Red
-    Write-Host "如果要忽略检查强制提交，请使用: git commit --no-verify" -ForegroundColor Yellow
+    Write-Host "[!] Secret Guardian: Sensitive info detected, commit blocked!" -ForegroundColor Red
+    Write-Host "[*] To skip check: git commit --no-verify" -ForegroundColor Yellow
     exit 1
 }}
 exit 0
 """,
         "pre-push.ps1": f"""# Secret Guardian - Pre-push hook (PowerShell)
-Write-Host "🔍 Secret Guardian: 正在扫描推送内容..." -ForegroundColor Cyan
+Write-Host "[Secret Guardian] Scanning push content..." -ForegroundColor Cyan
 python "{script_path}" pre-push
 if ($LASTEXITCODE -ne 0) {{
     Write-Host ""
-    Write-Host "🔴 敏感信息被检测到！推送已阻止。" -ForegroundColor Red
-    Write-Host "如果要忽略检查强制推送，请使用: git push --no-verify" -ForegroundColor Yellow
+    Write-Host "[!] Secret Guardian: Sensitive info detected, push blocked!" -ForegroundColor Red
+    Write-Host "[*] To skip check: git push --no-verify" -ForegroundColor Yellow
     exit 1
 }}
 exit 0
@@ -657,13 +682,15 @@ exit 0
         hook_path = hook_dir / hook_name
         with open(hook_path, "w", encoding="utf-8") as f:
             f.write(hook_content)
-        print(f"  ✅ 已创建: {hook_path}")
+        print(f"  [OK] Created: {hook_path}")
 
-    print(f"\n📁 钩子目录: {hook_dir}")
-    print("\n现在执行以下命令启用全局钩子：")
+    print(f"\n[Hooks directory: {hook_dir}")
+    print("\nNow run this command to enable global hooks:")
     print(f"  git config --global core.hooksPath \"{hook_dir}\"")
     print("")
-    print("完成后，所有 Git 仓库都会自动应用这些钩子！")
+    print("After that, ALL git repos will automatically use these hooks!")
+    print("\nHooks work with Git Bash (MSYS2 shell included with Git for Windows).")
+    print("If using PowerShell/cmd, Git for Windows >= 2.37+ is required.")
 
 
 if __name__ == "__main__":
