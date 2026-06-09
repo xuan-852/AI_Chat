@@ -3,3 +3,24 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# ====================
+# 安全：敏感配置文件（含 API Key）
+# ====================
+tools/config.py
+include/config.h
+
+# ====================
+# Python 缓存 & 环境
+# ====================
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# ====================
+# 系统文件
+# ====================
+*.log
+.DS_Store
+Thumbs.db
